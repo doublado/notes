@@ -43,15 +43,19 @@ export const useThemeStore = defineStore(
      * Initializes the theme on the client side.
      */
     function initTheme() {
-      _applyTheme(isDark.value)
+      if (import.meta.client) {
+        _applyTheme(isDark.value)
+      }
     }
 
     /**
      * Toggles the theme and sets the user's preference.
      */
     function toggleTheme() {
-      userPreference.value = !isDark.value
-      _applyTheme(userPreference.value)
+      if (import.meta.client) {
+        userPreference.value = !isDark.value
+        _applyTheme(userPreference.value)
+      }
     }
 
     /**
