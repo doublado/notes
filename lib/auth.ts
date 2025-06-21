@@ -28,6 +28,7 @@ export const auth = betterAuth({
             console.log('🔑 Token:', token)
             console.log('⏰ Expires in: 1 hour')
             console.log('---')
+            // TODO: Setup email sending with any SMTP provider
             // In a real implementation, you would send an email here
             // For testing, we'll just log the details
             // Example: await sendEmail({
@@ -47,6 +48,7 @@ export const auth = betterAuth({
             console.log('🔑 Token:', token)
             console.log('⏰ Expires in: 1 hour')
             console.log('---')
+            // TODO: Setup email sending with any SMTP provider
             // In a real implementation, you would send an email here
             // For testing, we'll just log the details
             // Example: await sendEmail({
@@ -58,5 +60,6 @@ export const auth = betterAuth({
         sendOnSignUp: true,
 		autoSignInAfterVerification: true,
         expiresIn: 3600,
+        callbackURL: '/dashboard',
     },
 })
