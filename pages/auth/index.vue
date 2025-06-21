@@ -188,6 +188,18 @@ const getErrorMessage = (error: AuthError): { content: string; hasLink: boolean 
   const errorMessage = error.message?.toLowerCase() || ''
   const errorCode = error.code?.toLowerCase() || ''
   
+  // Validation errors (like "Invalid body parameters")
+  if (errorCode === 'validation_error' || 
+      errorMessage.includes('invalid body parameters') ||
+      errorMessage.includes('validation failed') ||
+      errorMessage.includes('invalid parameters') ||
+      errorMessage.includes('missing required')) {
+    return {
+      content: 'Please check that you entered valid information and try again.',
+      hasLink: false
+    }
+  }
+  
   // Email verification needed - be more specific
   if (errorCode === 'email_not_verified' || 
       errorMessage.includes('email not verified') || 
@@ -236,7 +248,7 @@ const getErrorMessage = (error: AuthError): { content: string; hasLink: boolean 
       errorMessage.includes('password too weak') ||
       errorMessage.includes('password is too short')) {
     return {
-      content: 'Password is too weak. Please choose a stronger password (at least 6 characters).',
+      content: 'Password is too weak. Please choose a stronger password (at least 8 characters).',
       hasLink: false
     }
   }
@@ -252,14 +264,24 @@ const getErrorMessage = (error: AuthError): { content: string; hasLink: boolean 
   // Network/server errors
   if (errorCode === 'network_error' || errorMessage.includes('network') || errorMessage.includes('connection')) {
     return {
-      content: 'Network error. Please check your internet connection and try again.',
+      content: 'Connection error. Please check your internet connection and try again.',
       hasLink: false
     }
   }
   
-  // Default fallback
+  // Server errors
+  if (errorCode === 'server_error' || 
+      errorMessage.includes('server error') ||
+      errorMessage.includes('internal error')) {
+    return {
+      content: 'A server error occurred. Please try again in a few moments.',
+      hasLink: false
+    }
+  }
+  
+  // Default fallback - provide a more helpful message
   return {
-    content: error.message || 'An unexpected error occurred. Please try again.',
+    content: 'Something went wrong. Please check your information and try again. If the problem persists, please contact support.',
     hasLink: false
   }
 }
@@ -295,10 +317,12 @@ const handleLogin = async () => {
     }
   } catch (error) {
     console.error('Login error:', error)
+    const messageType = getMessageType(error as AuthError)
+    const { content, hasLink } = getErrorMessage(error as AuthError)
     loginMessage.value = {
-      type: 'error',
-      content: 'An unexpected error occurred. Please try again.',
-      hasLink: false
+      type: messageType,
+      content,
+      hasLink
     }
   } finally {
     isLoggingIn.value = false
@@ -337,16 +361,18 @@ const handleRegister = async () => {
       // Show success message
       loginMessage.value = {
         type: 'info',
-        content: 'Account created successfully! Please check your email for verification.',
+        content: 'Account created successfully! Please check your email inbox for a verification link.',
         hasLink: false
       }
     }
   } catch (error) {
     console.error('Registration error:', error)
+    const messageType = getMessageType(error as AuthError)
+    const { content, hasLink } = getErrorMessage(error as AuthError)
     registerMessage.value = {
-      type: 'error',
-      content: 'An unexpected error occurred. Please try again.',
-      hasLink: false
+      type: messageType,
+      content,
+      hasLink
     }
   } finally {
     isRegistering.value = false
