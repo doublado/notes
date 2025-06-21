@@ -128,7 +128,7 @@ const testPasswordReset = async () => {
                 <h3 class="text-lg font-semibold text-color mb-4">Test Password Reset</h3>
                 <p class="text-color-secondary mb-4">
                   Use this button to test the password reset functionality. 
-                  Check your browser console to see the detailed logs.
+                  <strong>For developers:</strong> Check your browser console to see the detailed logs.
                 </p>
                 
                 <div class="mb-4">
@@ -164,7 +164,7 @@ const testPasswordReset = async () => {
                   <div class="flex items-start">
                     <i class="pi pi-check-circle text-green-500 mr-2 mt-0.5" />
                     <div>
-                      <strong>Password Reset:</strong> Click "Test Password Reset" and check the console for detailed logs showing the reset email details.
+                      <strong>Password Reset:</strong> Click "Test Password Reset" and check the browser console (F12) for detailed logs showing the reset email details.
                     </div>
                   </div>
                   <div class="flex items-start">
