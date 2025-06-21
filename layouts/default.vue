@@ -1,6 +1,11 @@
 <script setup lang="ts">
 const themeStore = useThemeStore()
 
+// Computed property for theme icon to ensure consistency
+const themeIcon = computed(() => {
+  return themeStore.isDark ? 'pi pi-sun' : 'pi pi-moon'
+})
+
 // Initialize theme on mount
 onMounted(() => {
   themeStore.initTheme()
@@ -16,8 +21,8 @@ onMounted(() => {
 
 const router = useRouter()
 
-const navigateToDashboard = () => {
-  router.push('/dashboard')
+const navigateToAuth = (tab: 'signin' | 'signup' = 'signin') => {
+  router.push(`/auth?tab=${tab}`)
 }
 </script>
 
@@ -35,23 +40,25 @@ const navigateToDashboard = () => {
           </div>
           <div class="flex items-center space-x-4">
             <!-- Theme Toggle Button -->
-            <Button 
-              :icon="themeStore.isDark ? 'pi pi-sun' : 'pi pi-moon'"
-              severity="secondary" 
-              text
-              :aria-label="themeStore.isDark ? 'Switch to light mode' : 'Switch to dark mode'"
-              @click="themeStore.toggleTheme"
-            />
+            <ClientOnly>
+              <Button 
+                :icon="themeIcon"
+                severity="secondary" 
+                text
+                :aria-label="themeStore.isDark ? 'Switch to light mode' : 'Switch to dark mode'"
+                @click="themeStore.toggleTheme"
+              />
+            </ClientOnly>
             <Button 
               label="Sign In" 
               severity="secondary" 
               text 
               class="hidden sm:block"
-              @click="navigateToDashboard"
+              @click="navigateToAuth('signin')"
             />
             <Button 
-              label="Get Started"
-              @click="navigateToDashboard"
+              label="Sign Up"
+              @click="navigateToAuth('signup')"
             />
           </div>
         </div>
