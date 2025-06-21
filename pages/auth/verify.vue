@@ -5,11 +5,14 @@ definePageMeta({
   layout: "default",
 })
 
-const route = useRoute()
-const router = useRouter()
+// Define proper error type interface
+interface AuthError {
+  message?: string
+  code?: string
+  [key: string]: unknown
+}
 
-// Get token from URL
-const token = route.query.token as string
+const router = useRouter()
 
 // Form data
 const emailForm = ref({
@@ -23,12 +26,7 @@ const emailErrors = ref({
 
 // Loading and result states
 const isSendingVerification = ref(false)
-const isVerifying = ref(false)
-const emailResult = ref<{ success: boolean; message: string } | null>(null)
-const verificationResult = ref<{ success: boolean; message: string } | null>(null)
-
-// Track if we're showing the form (when no token or verification failed)
-const showForm = ref(!token)
+const emailResult = ref<{ type: 'error' | 'warning' | 'info' | 'success'; content: string } | null>(null)
 
 // Validation
 const validateEmail = (email: string) => {
@@ -51,42 +49,78 @@ const validateEmailForm = () => {
   return isValid
 }
 
-// Handle email verification with token
-const handleEmailVerification = async () => {
-  if (!token) {
-    verificationResult.value = {
-      success: false,
-      message: 'No verification token provided.'
+// Helper function to get user-friendly error message
+const getErrorMessage = (error: AuthError): { content: string; type: 'error' | 'warning' | 'info' | 'success' } => {
+  const errorMessage = error.message?.toLowerCase() || ''
+  const errorCode = error.code?.toLowerCase() || ''
+  
+  // Validation errors (like "Invalid body parameters")
+  if (errorCode === 'validation_error' || 
+      errorMessage.includes('invalid body parameters') ||
+      errorMessage.includes('validation failed') ||
+      errorMessage.includes('invalid parameters') ||
+      errorMessage.includes('missing required')) {
+    return {
+      content: 'Please check that you entered a valid email address and try again.',
+      type: 'error'
     }
-    showForm.value = true
-    return
   }
-
-  isVerifying.value = true
-  try {
-    console.log('✅ Verifying email with token:', token)
-    
-    // Better Auth automatically handles email verification via URL redirects
-    // The token in the URL should trigger the verification automatically
-    // We just need to wait for the redirect to complete
-    verificationResult.value = {
-      success: true,
-      message: 'Email verified successfully! You are now signed in.'
+  
+  // User not found
+  if (errorCode === 'user_not_found' || 
+      errorMessage.includes('user not found') ||
+      errorMessage.includes('no user found') ||
+      errorMessage.includes('account not found')) {
+    return {
+      content: 'No account found with this email address. Please check your email or create a new account.',
+      type: 'error'
     }
-    
-    // Redirect to dashboard after a short delay
-    setTimeout(() => {
-      router.push('/dashboard')
-    }, 2000)
-  } catch (error) {
-    console.error('❌ Email verification error:', error)
-    verificationResult.value = {
-      success: false,
-      message: 'An unexpected error occurred during verification.'
+  }
+  
+  // Email already verified - check for various possible messages
+  if (errorCode === 'email_already_verified' || 
+      errorMessage.includes('already verified') ||
+      errorMessage.includes('email is already verified') ||
+      errorMessage.includes('already been verified') ||
+      errorMessage.includes('email verified') ||
+      errorMessage.includes('already confirmed') ||
+      errorMessage.includes('already active')) {
+    return {
+      content: 'This email address is already verified. You can now sign in to your account.',
+      type: 'info'
     }
-    showForm.value = true
-  } finally {
-    isVerifying.value = false
+  }
+  
+  // Rate limiting
+  if (errorCode === 'rate_limit_exceeded' || errorMessage.includes('rate limit')) {
+    return {
+      content: 'Too many attempts. Please wait a few minutes before trying again.',
+      type: 'warning'
+    }
+  }
+  
+  // Network/server errors
+  if (errorCode === 'network_error' || errorMessage.includes('network') || errorMessage.includes('connection')) {
+    return {
+      content: 'Connection error. Please check your internet connection and try again.',
+      type: 'error'
+    }
+  }
+  
+  // Server errors
+  if (errorCode === 'server_error' || 
+      errorMessage.includes('server error') ||
+      errorMessage.includes('internal error')) {
+    return {
+      content: 'A server error occurred. Please try again in a few moments.',
+      type: 'error'
+    }
+  }
+  
+  // Default fallback - provide a more helpful message
+  return {
+    content: 'Something went wrong. Please check your email address and try again. If the problem persists, please contact support.',
+    type: 'error'
   }
 }
 
@@ -100,28 +134,30 @@ const handleRequestVerification = async () => {
     
     const result = await authClient.sendVerificationEmail({
       email: emailForm.value.email,
-      callbackURL: '/auth/verify'
+      callbackURL: '/dashboard'
     })
     
     if (result.error) {
       console.error('❌ Email verification request failed:', result.error)
+      const { content, type } = getErrorMessage(result.error)
       emailResult.value = {
-        success: false,
-        message: result.error.message || 'Failed to send verification email. Please try again.'
+        type,
+        content
       }
     } else {
       console.log('✅ Email verification sent successfully!')
       emailResult.value = {
-        success: true,
-        message: 'Verification email sent! Check your email and console logs for details.'
+        type: 'success',
+        content: 'Verification email sent! Please check your email inbox and click the verification link.'
       }
       emailForm.value.email = '' // Clear form
     }
   } catch (error) {
     console.error('❌ Email verification request error:', error)
+    const { content, type } = getErrorMessage(error as AuthError)
     emailResult.value = {
-      success: false,
-      message: 'An unexpected error occurred. Please try again.'
+      type,
+      content
     }
   } finally {
     isSendingVerification.value = false
@@ -131,132 +167,98 @@ const handleRequestVerification = async () => {
 const goToSignIn = () => {
   router.push('/auth?tab=signin')
 }
-
-const showVerificationForm = () => {
-  showForm.value = true
-}
-
-// Handle verification on mount if token is provided
-onMounted(() => {
-  if (token) {
-    handleEmailVerification()
-  }
-})
 </script>
 
 <template>
-  <div class="min-h-screen surface-ground flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
+  <div class="h-[calc(100vh-5rem)] surface-ground flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
     <div class="max-w-md w-full">
       <Card class="border-0 shadow-4">
         <template #content>
           <div class="p-6">
-            <!-- Email Verification with Token -->
-            <div v-if="token && !showForm">
-              <!-- Loading state -->
-              <div v-if="isVerifying" class="text-center space-y-4">
-                <i class="pi pi-spin pi-spinner text-4xl text-primary" />
-                <h2 class="text-xl font-semibold text-color">Verifying Email...</h2>
-                <p class="text-color-secondary">Please wait while we verify your email address.</p>
-              </div>
-
-              <!-- Verification result -->
-              <div v-else-if="verificationResult" class="text-center space-y-4">
-                <div v-if="verificationResult.success" class="space-y-4">
-                  <i class="pi pi-check-circle text-4xl text-green-500" />
-                  <h2 class="text-xl font-semibold text-color">Email Verified!</h2>
-                  <p class="text-color-secondary">{{ verificationResult.message }}</p>
-                  <div class="flex justify-center">
-                    <i class="pi pi-spin pi-spinner text-primary" />
-                    <span class="ml-2 text-sm text-color-secondary">Redirecting to dashboard...</span>
-                  </div>
-                </div>
-                <div v-else class="space-y-4">
-                  <i class="pi pi-exclamation-triangle text-4xl text-red-500" />
-                  <h2 class="text-xl font-semibold text-color">Verification Failed</h2>
-                  <p class="text-color-secondary">{{ verificationResult.message }}</p>
-                  <div class="flex flex-col sm:flex-row gap-2 justify-center">
-                    <Button 
-                      label="Request New Verification" 
-                      severity="secondary"
-                      @click="showVerificationForm"
-                    />
-                    <Button 
-                      label="Go to Sign In" 
-                      @click="goToSignIn"
-                    />
-                  </div>
+            <!-- Success/Error message -->
+            <div v-if="emailResult" class="mb-6">
+              <div 
+                class="p-4 rounded-lg border" 
+                :class="{
+                  'bg-red-50 border-red-200': emailResult.type === 'error',
+                  'bg-yellow-50 border-yellow-200': emailResult.type === 'warning',
+                  'bg-blue-50 border-blue-200': emailResult.type === 'info',
+                  'bg-green-50 border-green-200': emailResult.type === 'success'
+                }"
+              >
+                <div class="flex items-start">
+                  <i 
+                    :class="{
+                      'pi pi-exclamation-triangle text-red-500': emailResult.type === 'error',
+                      'pi pi-exclamation-circle text-yellow-500': emailResult.type === 'warning',
+                      'pi pi-info-circle text-blue-500': emailResult.type === 'info',
+                      'pi pi-check-circle text-green-500': emailResult.type === 'success'
+                    }" 
+                    class="mr-2 mt-0.5" 
+                  />
+                  <p 
+                    :class="{
+                      'text-red-600': emailResult.type === 'error',
+                      'text-yellow-600': emailResult.type === 'warning',
+                      'text-blue-600': emailResult.type === 'info',
+                      'text-green-600': emailResult.type === 'success'
+                    }" 
+                    class="text-sm"
+                  >
+                    {{ emailResult.content }}
+                  </p>
                 </div>
               </div>
             </div>
 
-            <!-- Email Request Form (when no token is provided or verification failed) -->
-            <div v-else>
-              <!-- Success/Error message -->
-              <div v-if="emailResult" class="mb-6">
-                <div v-if="emailResult.success" class="p-4 bg-green-50 border border-green-200 rounded-lg">
-                  <div class="flex items-center">
-                    <i class="pi pi-check-circle text-green-500 mr-2" />
-                    <p class="text-sm text-green-600">{{ emailResult.message }}</p>
-                  </div>
-                </div>
-                <div v-else class="p-4 bg-red-50 border border-red-200 rounded-lg">
-                  <div class="flex items-center">
-                    <i class="pi pi-exclamation-triangle text-red-500 mr-2" />
-                    <p class="text-sm text-red-600">{{ emailResult.message }}</p>
-                  </div>
-                </div>
-              </div>
+            <div class="text-center mb-6">
+              <i class="pi pi-envelope text-4xl text-primary mb-4" />
+              <h2 class="text-xl font-semibold text-color mb-2">Verify Your Email</h2>
+              <p class="text-color-secondary">
+                Enter your email address and we'll send you a verification link.
+              </p>
+            </div>
 
-              <div class="text-center mb-6">
-                <i class="pi pi-envelope text-4xl text-primary mb-4" />
-                <h2 class="text-xl font-semibold text-color mb-2">Verify Your Email</h2>
-                <p class="text-color-secondary">
-                  Enter your email address and we'll send you a verification link.
-                </p>
-              </div>
-
-              <form class="space-y-6" @submit.prevent="handleRequestVerification">
-                <div>
-                  <label for="verify-email" class="block text-sm font-medium text-color mb-2">
-                    Email Address
-                  </label>
-                  <InputText
-                    id="verify-email"
-                    v-model="emailForm.email"
-                    type="email"
-                    placeholder="Enter your email"
-                    :class="{ 'p-invalid': emailErrors.email }"
-                    class="w-full"
-                    autocomplete="email"
-                  />
-                  <small v-if="emailErrors.email" class="p-error block mt-1">
-                    {{ emailErrors.email }}
-                  </small>
-                </div>
-
-                <Button
-                  type="submit"
-                  label="Send Verification Email"
-                  :loading="isSendingVerification"
+            <form class="space-y-6" @submit.prevent="handleRequestVerification">
+              <div>
+                <label for="verify-email" class="block text-sm font-medium text-color mb-2">
+                  Email Address
+                </label>
+                <InputText
+                  id="verify-email"
+                  v-model="emailForm.email"
+                  type="email"
+                  placeholder="Enter your email"
+                  :class="{ 'p-invalid': emailErrors.email }"
                   class="w-full"
-                  size="large"
-                >
-                  <template #icon>
-                    <i class="pi pi-envelope mr-2" />
-                  </template>
-                </Button>
-              </form>
-
-              <div class="text-center mt-6">
-                <button 
-                  type="button"
-                  class="text-sm text-color-secondary hover:text-primary transition-colors"
-                  @click="goToSignIn"
-                >
-                  <i class="pi pi-arrow-left mr-1" />
-                  Back to sign in
-                </button>
+                  autocomplete="email"
+                />
+                <small v-if="emailErrors.email" class="p-error block mt-1">
+                  {{ emailErrors.email }}
+                </small>
               </div>
+
+              <Button
+                type="submit"
+                label="Send Verification Email"
+                :loading="isSendingVerification"
+                class="w-full"
+                size="large"
+              >
+                <template #icon>
+                  <i class="pi pi-envelope mr-2" />
+                </template>
+              </Button>
+            </form>
+
+            <div class="text-center mt-6">
+              <button 
+                type="button"
+                class="text-sm text-color-secondary hover:text-primary transition-colors"
+                @click="goToSignIn"
+              >
+                <i class="pi pi-arrow-left mr-1"/><span class="hover:underline">Back to sign in</span>
+              </button>
             </div>
           </div>
         </template>
