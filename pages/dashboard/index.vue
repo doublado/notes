@@ -1,7 +1,38 @@
 <script setup lang="ts">
+import { authClient } from "~/lib/auth-client"
+
 definePageMeta({
   layout: "default",
 })
+
+// Test email for demonstration
+const testEmail = ref('test@example.com')
+
+// Loading states
+const isTestingReset = ref(false)
+
+// Test functions
+const testPasswordReset = async () => {
+  if (!testEmail.value) return
+  
+  isTestingReset.value = true
+  try {
+    const result = await authClient.requestPasswordReset({
+      email: testEmail.value,
+      redirectTo: '/auth/reset'
+    })
+    
+    if (result.error) {
+      console.error('Test reset error:', result.error)
+    } else {
+      console.log('✅ Test password reset email sent successfully!')
+    }
+  } catch (error) {
+    console.error('Test reset error:', error)
+  } finally {
+    isTestingReset.value = false
+  }
+}
 </script>
 
 <template>
@@ -80,6 +111,79 @@ definePageMeta({
             class="px-6 py-3"
           />
         </div>
+      </div>
+
+      <!-- Auth Testing Section -->
+      <div class="mt-12">
+        <Card class="border-0 shadow-2">
+          <template #header>
+            <div class="flex items-center">
+              <i class="pi pi-cog text-xl text-primary mr-3" />
+              <h2 class="text-xl font-semibold text-color">Auth Testing</h2>
+            </div>
+          </template>
+          <template #content>
+            <div class="p-6">
+              <div class="mb-6">
+                <h3 class="text-lg font-semibold text-color mb-4">Test Password Reset</h3>
+                <p class="text-color-secondary mb-4">
+                  Use this button to test the password reset functionality. 
+                  Check your browser console to see the detailed logs.
+                </p>
+                
+                <div class="mb-4">
+                  <label for="test-email" class="block text-sm font-medium text-color mb-2">
+                    Test Email Address
+                  </label>
+                  <InputText
+                    id="test-email"
+                    v-model="testEmail"
+                    type="email"
+                    placeholder="Enter email to test"
+                    class="w-full max-w-md"
+                  />
+                </div>
+
+                <div class="flex flex-wrap gap-4">
+                  <Button 
+                    label="Test Password Reset" 
+                    icon="pi pi-lock"
+                    :loading="isTestingReset"
+                    severity="secondary"
+                    class="px-6 py-3"
+                    @click="testPasswordReset"
+                  />
+                </div>
+              </div>
+
+              <Divider />
+
+              <div class="mt-6">
+                <h4 class="text-md font-semibold text-color mb-3">How to Test:</h4>
+                <div class="space-y-3 text-sm text-color-secondary">
+                  <div class="flex items-start">
+                    <i class="pi pi-check-circle text-green-500 mr-2 mt-0.5" />
+                    <div>
+                      <strong>Password Reset:</strong> Click "Test Password Reset" and check the console for detailed logs showing the reset email details.
+                    </div>
+                  </div>
+                  <div class="flex items-start">
+                    <i class="pi pi-info-circle text-blue-500 mr-2 mt-0.5" />
+                    <div>
+                      <strong>Email Verification:</strong> Use the dedicated verification page at <code class="bg-gray-100 px-1 rounded">/auth/verify</code> to test email verification.
+                    </div>
+                  </div>
+                  <div class="flex items-start">
+                    <i class="pi pi-info-circle text-blue-500 mr-2 mt-0.5" />
+                    <div>
+                      <strong>Real Implementation:</strong> Replace the console.log statements in <code class="bg-gray-100 px-1 rounded">lib/auth.ts</code> with actual email sending logic.
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </template>
+        </Card>
       </div>
     </div>
   </div>
