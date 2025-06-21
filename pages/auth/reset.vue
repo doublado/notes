@@ -5,6 +5,13 @@ definePageMeta({
   layout: "default",
 })
 
+// Define proper error type interface
+interface AuthError {
+  message?: string
+  code?: string
+  [key: string]: unknown
+}
+
 const route = useRoute()
 const router = useRouter()
 
@@ -34,8 +41,8 @@ const emailErrors = ref({
 // Loading and result states
 const isResetting = ref(false)
 const isSendingReset = ref(false)
-const resetResult = ref<{ success: boolean; message: string } | null>(null)
-const emailResult = ref<{ success: boolean; message: string } | null>(null)
+const resetResult = ref<{ type: 'error' | 'warning' | 'info' | 'success'; content: string } | null>(null)
+const emailResult = ref<{ type: 'error' | 'warning' | 'info' | 'success'; content: string } | null>(null)
 
 // Validation
 const validateEmail = (email: string) => {
@@ -85,12 +92,93 @@ const validateEmailForm = () => {
   return isValid
 }
 
+// Helper function to get user-friendly error message
+const getErrorMessage = (error: AuthError): { content: string; type: 'error' | 'warning' | 'info' | 'success' } => {
+  const errorMessage = error.message?.toLowerCase() || ''
+  const errorCode = error.code?.toLowerCase() || ''
+  
+  // Validation errors (like "Invalid body parameters")
+  if (errorCode === 'validation_error' || 
+      errorMessage.includes('invalid body parameters') ||
+      errorMessage.includes('validation failed') ||
+      errorMessage.includes('invalid parameters') ||
+      errorMessage.includes('missing required')) {
+    return {
+      content: 'Please check that you entered a valid email address and try again.',
+      type: 'error'
+    }
+  }
+  
+  // User not found
+  if (errorCode === 'user_not_found' || 
+      errorMessage.includes('user not found') ||
+      errorMessage.includes('no user found') ||
+      errorMessage.includes('account not found')) {
+    return {
+      content: 'No account found with this email address. Please check your email or create a new account.',
+      type: 'error'
+    }
+  }
+  
+  // Invalid token
+  if (errorCode === 'invalid_token' || 
+      errorMessage.includes('invalid token') ||
+      errorMessage.includes('expired token')) {
+    return {
+      content: 'Invalid or expired reset link. Please request a new password reset email.',
+      type: 'warning'
+    }
+  }
+  
+  // Password too weak
+  if (errorCode === 'password_too_weak' || 
+      errorMessage.includes('password too weak') ||
+      errorMessage.includes('password is too short')) {
+    return {
+      content: 'Password is too weak. Please choose a stronger password (at least 8 characters).',
+      type: 'error'
+    }
+  }
+  
+  // Rate limiting
+  if (errorCode === 'rate_limit_exceeded' || errorMessage.includes('rate limit')) {
+    return {
+      content: 'Too many attempts. Please wait a few minutes before trying again.',
+      type: 'warning'
+    }
+  }
+  
+  // Network/server errors
+  if (errorCode === 'network_error' || errorMessage.includes('network') || errorMessage.includes('connection')) {
+    return {
+      content: 'Connection error. Please check your internet connection and try again.',
+      type: 'error'
+    }
+  }
+  
+  // Server errors
+  if (errorCode === 'server_error' || 
+      errorMessage.includes('server error') ||
+      errorMessage.includes('internal error')) {
+    return {
+      content: 'A server error occurred. Please try again in a few moments.',
+      type: 'error'
+    }
+  }
+  
+  // Default fallback - provide a more helpful message
+  return {
+    content: 'Something went wrong. Please check your email address and try again. If the problem persists, please contact support.',
+    type: 'error'
+  }
+}
+
 // Handle password reset
 const handleResetPassword = async () => {
   if (!token) {
     resetResult.value = {
-      success: false,
-      message: 'No reset token provided.'
+      type: 'error',
+      content: 'No reset token provided.'
     }
     return
   }
@@ -108,22 +196,24 @@ const handleResetPassword = async () => {
     
     if (result.error) {
       console.error('❌ Password reset failed:', result.error)
+      const { content, type } = getErrorMessage(result.error)
       resetResult.value = {
-        success: false,
-        message: result.error.message || 'Password reset failed. Please try again.'
+        type,
+        content
       }
     } else {
       console.log('✅ Password reset successfully!')
       resetResult.value = {
-        success: true,
-        message: 'Password reset successfully! You can now sign in with your new password.'
+        type: 'success',
+        content: 'Password reset successfully! You can now sign in with your new password.'
       }
     }
   } catch (error) {
     console.error('❌ Password reset error:', error)
+    const { content, type } = getErrorMessage(error as AuthError)
     resetResult.value = {
-      success: false,
-      message: 'An unexpected error occurred during password reset.'
+      type,
+      content
     }
   } finally {
     isResetting.value = false
@@ -145,23 +235,25 @@ const handleRequestReset = async () => {
     
     if (result.error) {
       console.error('❌ Password reset request failed:', result.error)
+      const { content, type } = getErrorMessage(result.error)
       emailResult.value = {
-        success: false,
-        message: result.error.message || 'Failed to send reset email. Please try again.'
+        type,
+        content
       }
     } else {
       console.log('✅ Password reset email sent successfully!')
       emailResult.value = {
-        success: true,
-        message: 'Password reset email sent! Check your email and console logs for details.'
+        type: 'success',
+        content: 'Password reset email sent! Please check your email inbox and click the reset link.'
       }
       emailForm.value.email = '' // Clear form
     }
   } catch (error) {
     console.error('❌ Password reset request error:', error)
+    const { content, type } = getErrorMessage(error as AuthError)
     emailResult.value = {
-      success: false,
-      message: 'An unexpected error occurred. Please try again.'
+      type,
+      content
     }
   } finally {
     isSendingReset.value = false
@@ -174,7 +266,7 @@ const goToSignIn = () => {
 </script>
 
 <template>
-  <div class="min-h-screen surface-ground flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
+  <div class="h-[calc(100vh-5rem)] surface-ground flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
     <div class="max-w-md w-full">
       <Card class="border-0 shadow-4">
         <template #content>
@@ -183,22 +275,42 @@ const goToSignIn = () => {
             <div v-if="token">
               <!-- Success/Error message -->
               <div v-if="resetResult" class="mb-6">
-                <div v-if="resetResult.success" class="p-4 bg-green-50 border border-green-200 rounded-lg">
-                  <div class="flex items-center">
-                    <i class="pi pi-check-circle text-green-500 mr-2" />
-                    <p class="text-sm text-green-600">{{ resetResult.message }}</p>
-                  </div>
-                </div>
-                <div v-else class="p-4 bg-red-50 border border-red-200 rounded-lg">
-                  <div class="flex items-center">
-                    <i class="pi pi-exclamation-triangle text-red-500 mr-2" />
-                    <p class="text-sm text-red-600">{{ resetResult.message }}</p>
+                <div 
+                  class="p-4 rounded-lg border" 
+                  :class="{
+                    'bg-red-50 border-red-200': resetResult.type === 'error',
+                    'bg-yellow-50 border-yellow-200': resetResult.type === 'warning',
+                    'bg-blue-50 border-blue-200': resetResult.type === 'info',
+                    'bg-green-50 border-green-200': resetResult.type === 'success'
+                  }"
+                >
+                  <div class="flex items-start">
+                    <i 
+                      :class="{
+                        'pi pi-exclamation-triangle text-red-500': resetResult.type === 'error',
+                        'pi pi-exclamation-circle text-yellow-500': resetResult.type === 'warning',
+                        'pi pi-info-circle text-blue-500': resetResult.type === 'info',
+                        'pi pi-check-circle text-green-500': resetResult.type === 'success'
+                      }" 
+                      class="mr-2 mt-0.5" 
+                    />
+                    <p 
+                      :class="{
+                        'text-red-600': resetResult.type === 'error',
+                        'text-yellow-600': resetResult.type === 'warning',
+                        'text-blue-600': resetResult.type === 'info',
+                        'text-green-600': resetResult.type === 'success'
+                      }" 
+                      class="text-sm"
+                    >
+                      {{ resetResult.content }}
+                    </p>
                   </div>
                 </div>
               </div>
 
               <!-- Reset form -->
-              <div v-if="!resetResult?.success">
+              <div v-if="!resetResult?.type || resetResult.type !== 'success'">
                 <div class="text-center mb-6">
                   <i class="pi pi-lock text-4xl text-primary mb-4" />
                   <h2 class="text-xl font-semibold text-color mb-2">Reset Your Password</h2>
@@ -271,14 +383,13 @@ const goToSignIn = () => {
               </div>
 
               <!-- Back to sign in -->
-              <div v-if="!resetResult?.success" class="text-center mt-6">
+              <div v-if="!resetResult?.type || resetResult.type !== 'success'" class="text-center mt-6">
                 <button 
                   type="button"
                   class="text-sm text-color-secondary hover:text-primary transition-colors"
                   @click="goToSignIn"
                 >
-                  <i class="pi pi-arrow-left mr-1" />
-                  Back to sign in
+                  <i class="pi pi-arrow-left mr-1"/><span class="hover:underline">Back to sign in</span>
                 </button>
               </div>
             </div>
@@ -287,16 +398,36 @@ const goToSignIn = () => {
             <div v-else>
               <!-- Success/Error message -->
               <div v-if="emailResult" class="mb-6">
-                <div v-if="emailResult.success" class="p-4 bg-green-50 border border-green-200 rounded-lg">
-                  <div class="flex items-center">
-                    <i class="pi pi-check-circle text-green-500 mr-2" />
-                    <p class="text-sm text-green-600">{{ emailResult.message }}</p>
-                  </div>
-                </div>
-                <div v-else class="p-4 bg-red-50 border border-red-200 rounded-lg">
-                  <div class="flex items-center">
-                    <i class="pi pi-exclamation-triangle text-red-500 mr-2" />
-                    <p class="text-sm text-red-600">{{ emailResult.message }}</p>
+                <div 
+                  class="p-4 rounded-lg border" 
+                  :class="{
+                    'bg-red-50 border-red-200': emailResult.type === 'error',
+                    'bg-yellow-50 border-yellow-200': emailResult.type === 'warning',
+                    'bg-blue-50 border-blue-200': emailResult.type === 'info',
+                    'bg-green-50 border-green-200': emailResult.type === 'success'
+                  }"
+                >
+                  <div class="flex items-start">
+                    <i 
+                      :class="{
+                        'pi pi-exclamation-triangle text-red-500': emailResult.type === 'error',
+                        'pi pi-exclamation-circle text-yellow-500': emailResult.type === 'warning',
+                        'pi pi-info-circle text-blue-500': emailResult.type === 'info',
+                        'pi pi-check-circle text-green-500': emailResult.type === 'success'
+                      }" 
+                      class="mr-2 mt-0.5" 
+                    />
+                    <p 
+                      :class="{
+                        'text-red-600': emailResult.type === 'error',
+                        'text-yellow-600': emailResult.type === 'warning',
+                        'text-blue-600': emailResult.type === 'info',
+                        'text-green-600': emailResult.type === 'success'
+                      }" 
+                      class="text-sm"
+                    >
+                      {{ emailResult.content }}
+                    </p>
                   </div>
                 </div>
               </div>
@@ -347,8 +478,7 @@ const goToSignIn = () => {
                   class="text-sm text-color-secondary hover:text-primary transition-colors"
                   @click="goToSignIn"
                 >
-                  <i class="pi pi-arrow-left mr-1" />
-                  Back to sign in
+                  <i class="pi pi-arrow-left mr-1"/><span class="hover:underline">Back to sign in</span>
                 </button>
               </div>
             </div>
