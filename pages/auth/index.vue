@@ -5,6 +5,13 @@ definePageMeta({
   layout: "default",
 })
 
+// Define proper error type interface
+interface AuthError {
+  message?: string
+  code?: string
+  [key: string]: unknown
+}
+
 // Get route and query parameters
 const route = useRoute()
 
@@ -39,9 +46,9 @@ const registerErrors = ref({
 const isLoggingIn = ref(false)
 const isRegistering = ref(false)
 
-// Error states
-const loginError = ref('')
-const registerError = ref('')
+// Message states with type and content
+const loginMessage = ref<{ type: 'error' | 'warning' | 'info' | 'success'; content: string; hasLink?: boolean } | null>(null)
+const registerMessage = ref<{ type: 'error' | 'warning' | 'info' | 'success'; content: string; hasLink?: boolean } | null>(null)
 
 // Active tab - initialize based on URL parameter
 const activeTab = ref(0)
@@ -72,13 +79,13 @@ const validateEmail = (email: string) => {
 }
 
 const validatePassword = (password: string) => {
-  return password.length >= 6
+  return password.length >= 8
 }
 
 const validateLoginForm = () => {
   let isValid = true
   loginErrors.value = { email: '', password: '' }
-  loginError.value = '' // Clear previous error
+  loginMessage.value = null // Clear previous message
 
   if (!loginForm.value.email) {
     loginErrors.value.email = 'Email is required'
@@ -99,7 +106,7 @@ const validateLoginForm = () => {
 const validateRegisterForm = () => {
   let isValid = true
   registerErrors.value = { name: '', email: '', password: '', confirmPassword: '' }
-  registerError.value = '' // Clear previous error
+  registerMessage.value = null // Clear previous message
 
   if (!registerForm.value.name.trim()) {
     registerErrors.value.name = 'Name is required'
@@ -118,7 +125,7 @@ const validateRegisterForm = () => {
     registerErrors.value.password = 'Password is required'
     isValid = false
   } else if (!validatePassword(registerForm.value.password)) {
-    registerErrors.value.password = 'Password must be at least 6 characters'
+    registerErrors.value.password = 'Password must be at least 8 characters'
     isValid = false
   }
 
@@ -131,6 +138,130 @@ const validateRegisterForm = () => {
   }
 
   return isValid
+}
+
+// Helper function to determine message type based on error
+const getMessageType = (error: AuthError): 'error' | 'warning' | 'info' | 'success' => {
+  const errorMessage = error.message?.toLowerCase() || ''
+  const errorCode = error.code?.toLowerCase() || ''
+  
+  // Check for specific error types - be more specific about email verification
+  if (errorCode === 'email_not_verified' || 
+      errorMessage.includes('email not verified') || 
+      errorMessage.includes('verify your email') ||
+      errorMessage.includes('email verification required')) {
+    return 'warning' // Email verification needed
+  }
+  
+  if (errorCode === 'invalid_credentials' || 
+      errorMessage.includes('invalid') || 
+      errorMessage.includes('incorrect') ||
+      errorMessage.includes('wrong password')) {
+    return 'error' // Invalid credentials
+  }
+  
+  if (errorCode === 'user_not_found' || 
+      errorMessage.includes('user not found') ||
+      errorMessage.includes('no user found') ||
+      errorMessage.includes('account not found')) {
+    return 'error' // User doesn't exist
+  }
+  
+  if (errorCode === 'email_already_exists' || 
+      errorMessage.includes('email already exists') ||
+      errorMessage.includes('email is already registered')) {
+    return 'warning' // Email already registered
+  }
+  
+  if (errorCode === 'password_too_weak' || 
+      errorMessage.includes('password too weak') ||
+      errorMessage.includes('password is too short')) {
+    return 'error' // Password issues
+  }
+  
+  // Default to error for unknown issues
+  return 'error'
+}
+
+// Helper function to get user-friendly error message
+const getErrorMessage = (error: AuthError): { content: string; hasLink: boolean } => {
+  const errorMessage = error.message?.toLowerCase() || ''
+  const errorCode = error.code?.toLowerCase() || ''
+  
+  // Email verification needed - be more specific
+  if (errorCode === 'email_not_verified' || 
+      errorMessage.includes('email not verified') || 
+      errorMessage.includes('verify your email') ||
+      errorMessage.includes('email verification required')) {
+    return {
+      content: 'Please verify your email address first.',
+      hasLink: true
+    }
+  }
+  
+  // Invalid credentials
+  if (errorCode === 'invalid_credentials' || 
+      errorMessage.includes('invalid') || 
+      errorMessage.includes('incorrect') ||
+      errorMessage.includes('wrong password')) {
+    return {
+      content: 'Invalid email or password. Please check your credentials and try again.',
+      hasLink: false
+    }
+  }
+  
+  // User not found
+  if (errorCode === 'user_not_found' || 
+      errorMessage.includes('user not found') ||
+      errorMessage.includes('no user found') ||
+      errorMessage.includes('account not found')) {
+    return {
+      content: 'No account found with this email address. Please check your email or create a new account.',
+      hasLink: false
+    }
+  }
+  
+  // Email already exists
+  if (errorCode === 'email_already_exists' || 
+      errorMessage.includes('email already exists') ||
+      errorMessage.includes('email is already registered')) {
+    return {
+      content: 'An account with this email already exists. Please sign in instead or use a different email.',
+      hasLink: false
+    }
+  }
+  
+  // Password too weak
+  if (errorCode === 'password_too_weak' || 
+      errorMessage.includes('password too weak') ||
+      errorMessage.includes('password is too short')) {
+    return {
+      content: 'Password is too weak. Please choose a stronger password (at least 6 characters).',
+      hasLink: false
+    }
+  }
+  
+  // Rate limiting
+  if (errorCode === 'rate_limit_exceeded' || errorMessage.includes('rate limit')) {
+    return {
+      content: 'Too many attempts. Please wait a few minutes before trying again.',
+      hasLink: false
+    }
+  }
+  
+  // Network/server errors
+  if (errorCode === 'network_error' || errorMessage.includes('network') || errorMessage.includes('connection')) {
+    return {
+      content: 'Network error. Please check your internet connection and try again.',
+      hasLink: false
+    }
+  }
+  
+  // Default fallback
+  return {
+    content: error.message || 'An unexpected error occurred. Please try again.',
+    hasLink: false
+  }
 }
 
 // Form submission handlers
@@ -149,14 +280,26 @@ const handleLogin = async () => {
     if (result.error) {
       // Handle login error
       console.error('Login error:', result.error)
-      loginError.value = result.error.message || 'Login failed. Please check your credentials.'
+      
+      const messageType = getMessageType(result.error)
+      const { content, hasLink } = getErrorMessage(result.error)
+      
+      loginMessage.value = {
+        type: messageType,
+        content,
+        hasLink
+      }
     } else {
       // Login successful - Better Auth will handle the redirect automatically
       console.log('Login successful')
     }
   } catch (error) {
     console.error('Login error:', error)
-    loginError.value = 'An unexpected error occurred. Please try again.'
+    loginMessage.value = {
+      type: 'error',
+      content: 'An unexpected error occurred. Please try again.',
+      hasLink: false
+    }
   } finally {
     isLoggingIn.value = false
   }
@@ -177,18 +320,34 @@ const handleRegister = async () => {
     if (result.error) {
       // Handle registration error
       console.error('Registration error:', result.error)
-      registerError.value = result.error.message || 'Registration failed. Please try again.'
+      
+      const messageType = getMessageType(result.error)
+      const { content, hasLink } = getErrorMessage(result.error)
+      
+      registerMessage.value = {
+        type: messageType,
+        content,
+        hasLink
+      }
     } else {
       // Registration successful, switch to login tab
       activeTab.value = 0
       // Clear register form
       registerForm.value = { name: '', email: '', password: '', confirmPassword: '' }
       // Show success message
-      loginError.value = 'Account created successfully! Please sign in.'
+      loginMessage.value = {
+        type: 'info',
+        content: 'Account created successfully! Please check your email for verification.',
+        hasLink: false
+      }
     }
   } catch (error) {
     console.error('Registration error:', error)
-    registerError.value = 'An unexpected error occurred. Please try again.'
+    registerMessage.value = {
+      type: 'error',
+      content: 'An unexpected error occurred. Please try again.',
+      hasLink: false
+    }
   } finally {
     isRegistering.value = false
   }
@@ -199,7 +358,7 @@ const handleKeydown = (event: KeyboardEvent) => {
   if (event.key === 'Enter') {
     if (activeTab.value === 0) {
       handleLogin()
-    } else {
+    } else if (activeTab.value === 1) {
       handleRegister()
     }
   }
@@ -216,9 +375,47 @@ const handleKeydown = (event: KeyboardEvent) => {
             <!-- Sign In Tab -->
             <TabPanel value="signin" header="Sign In" class="p-0">
               <form class="space-y-6" @submit.prevent="handleLogin" @keydown="handleKeydown">
-                <!-- Error message -->
-                <div v-if="loginError" class="p-4 bg-red-50 border border-red-200 rounded-lg">
-                  <p class="text-sm text-red-600">{{ loginError }}</p>
+                <!-- Message display -->
+                <div 
+                  v-if="loginMessage" 
+                  class="p-4 rounded-lg border" 
+                  :class="{
+                    'bg-red-50 border-red-200': loginMessage.type === 'error',
+                    'bg-yellow-50 border-yellow-200': loginMessage.type === 'warning',
+                    'bg-blue-50 border-blue-200': loginMessage.type === 'info',
+                    'bg-green-50 border-green-200': loginMessage.type === 'success'
+                  }"
+                >
+                  <div class="flex items-start">
+                    <i 
+                      :class="{
+                        'pi pi-exclamation-triangle text-red-500': loginMessage.type === 'error',
+                        'pi pi-exclamation-circle text-yellow-500': loginMessage.type === 'warning',
+                        'pi pi-info-circle text-blue-500': loginMessage.type === 'info',
+                        'pi pi-check-circle text-green-500': loginMessage.type === 'success'
+                      }" 
+                      class="mr-2 mt-0.5" 
+                    />
+                    <div 
+                      :class="{
+                        'text-red-600': loginMessage.type === 'error',
+                        'text-yellow-600': loginMessage.type === 'warning',
+                        'text-blue-600': loginMessage.type === 'info',
+                        'text-green-600': loginMessage.type === 'success'
+                      }" 
+                      class="text-sm"
+                    >
+                      <p>{{ loginMessage.content }}</p>
+                      <button 
+                        v-if="loginMessage.hasLink"
+                        type="button"
+                        class="text-primary hover:underline font-medium mt-1"
+                        @click="$router.push('/auth/verify')"
+                      >
+                        Click here to request a new verification email
+                      </button>
+                    </div>
+                  </div>
                 </div>
                 
                 <div>
@@ -270,9 +467,13 @@ const handleKeydown = (event: KeyboardEvent) => {
                       Remember me
                     </label>
                   </div>
-                  <a href="#" class="text-sm text-primary hover:underline">
+                  <button 
+                    type="button"
+                    class="text-sm text-primary hover:underline"
+                    @click="$router.push('/auth/reset')"
+                  >
                     Forgot password?
-                  </a>
+                  </button>
                 </div>
 
                 <Button
@@ -292,9 +493,47 @@ const handleKeydown = (event: KeyboardEvent) => {
             <!-- Sign Up Tab -->
             <TabPanel value="signup" header="Sign Up" class="p-0">
               <form class="space-y-6" @submit.prevent="handleRegister" @keydown="handleKeydown">
-                <!-- Error message -->
-                <div v-if="registerError" class="p-4 bg-red-50 border border-red-200 rounded-lg">
-                  <p class="text-sm text-red-600">{{ registerError }}</p>
+                <!-- Message display -->
+                <div 
+                  v-if="registerMessage" 
+                  class="p-4 rounded-lg border" 
+                  :class="{
+                    'bg-red-50 border-red-200': registerMessage.type === 'error',
+                    'bg-yellow-50 border-yellow-200': registerMessage.type === 'warning',
+                    'bg-blue-50 border-blue-200': registerMessage.type === 'info',
+                    'bg-green-50 border-green-200': registerMessage.type === 'success'
+                  }"
+                >
+                  <div class="flex items-start">
+                    <i 
+                      :class="{
+                        'pi pi-exclamation-triangle text-red-500': registerMessage.type === 'error',
+                        'pi pi-exclamation-circle text-yellow-500': registerMessage.type === 'warning',
+                        'pi pi-info-circle text-blue-500': registerMessage.type === 'info',
+                        'pi pi-check-circle text-green-500': registerMessage.type === 'success'
+                      }" 
+                      class="mr-2 mt-0.5" 
+                    />
+                    <div 
+                      :class="{
+                        'text-red-600': registerMessage.type === 'error',
+                        'text-yellow-600': registerMessage.type === 'warning',
+                        'text-blue-600': registerMessage.type === 'info',
+                        'text-green-600': registerMessage.type === 'success'
+                      }" 
+                      class="text-sm"
+                    >
+                      <p>{{ registerMessage.content }}</p>
+                      <button 
+                        v-if="registerMessage.hasLink"
+                        type="button"
+                        class="text-primary hover:underline font-medium mt-1"
+                        @click="$router.push('/auth/verify')"
+                      >
+                        Click here to request a new verification email
+                      </button>
+                    </div>
+                  </div>
                 </div>
                 
                 <div>
