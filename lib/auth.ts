@@ -21,6 +21,8 @@ export const auth = betterAuth({
         maxPasswordLength: 128,
         autoSignIn: true,
         sendResetPassword: async ({ user, url, token }) => {
+            // Logging for development/testing
+            // TODO: replace with actual email service in production
             console.log('🔐 PASSWORD RESET EMAIL SENT:')
             console.log('📧 To:', user.email)
             console.log('👤 User:', user.name)
@@ -28,19 +30,13 @@ export const auth = betterAuth({
             console.log('🔑 Token:', token)
             console.log('⏰ Expires in: 1 hour')
             console.log('---')
-            // TODO: Setup email sending with any SMTP provider
-            // In a real implementation, you would send an email here
-            // For testing, we'll just log the details
-            // Example: await sendEmail({
-            //   to: user.email,
-            //   subject: "Reset your password",
-            //   text: `Click the link to reset your password: ${url}`,
-            // });
         },
         resetPasswordTokenExpiresIn: 3600,
     },
     emailVerification: {
         sendVerificationEmail: async ({ user, url, token }) => {
+            // Logging for development/testing
+            // TODO: replace with actual email service in production
             console.log('✅ EMAIL VERIFICATION SENT:')
             console.log('📧 To:', user.email)
             console.log('👤 User:', user.name)
@@ -48,17 +44,9 @@ export const auth = betterAuth({
             console.log('🔑 Token:', token)
             console.log('⏰ Expires in: 1 hour')
             console.log('---')
-            // TODO: Setup email sending with any SMTP provider
-            // In a real implementation, you would send an email here
-            // For testing, we'll just log the details
-            // Example: await sendEmail({
-            //   to: user.email,
-            //   subject: "Verify your email address",
-            //   text: `Click the link to verify your email: ${url}`,
-            // });
         },
         sendOnSignUp: true,
-		autoSignInAfterVerification: true,
+        autoSignInAfterVerification: true,
         expiresIn: 3600,
         callbackURL: '/dashboard',
     },

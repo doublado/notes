@@ -53,7 +53,7 @@ const registerMessage = ref<{ type: 'error' | 'warning' | 'info' | 'success'; co
 // Active tab - initialize based on URL parameter
 const activeTab = ref(0)
 
-// Set initial tab based on URL parameter
+// Set initial tab based on URL parameter for better UX
 onMounted(() => {
   const tabParam = route.query.tab as string
   if (tabParam === 'signup') {

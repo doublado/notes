@@ -15,7 +15,7 @@ interface AuthError {
 const route = useRoute()
 const router = useRouter()
 
-// Get token from URL
+// Get token from URL for password reset
 const token = route.query.token as string
 
 // Form data

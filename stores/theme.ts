@@ -5,29 +5,25 @@ export const useThemeStore = defineStore(
   'theme',
   () => {
     /**
-     * Represents the user's explicit theme choice.
-     * `null`: follow system preference.
-     * `true`: dark mode.
-     * `false`: light mode.
+     * User's explicit theme choice - null means follow system preference
      */
     const userPreference = ref<boolean | null>(null)
 
     /**
-     * A computed property that determines if the dark theme should be active.
-     * It prioritizes the user's preference, falling back to the system setting.
+     * Determines active theme by prioritizing user choice over system preference
      */
     const isDark = computed(() => {
       if (userPreference.value !== null) {
         return userPreference.value
       }
       if (import.meta.server) {
-        return false // Default to light theme on server
+        return false // Server-side rendering default
       }
       return window.matchMedia('(prefers-color-scheme: dark)').matches
     })
 
     /**
-     * Applies the theme to the DOM by adding or removing the '.dark' class.
+     * Applies theme to DOM - only runs on client to avoid SSR issues
      */
     function _applyTheme(dark: boolean) {
       if (import.meta.server) return
@@ -40,7 +36,7 @@ export const useThemeStore = defineStore(
     }
 
     /**
-     * Initializes the theme on the client side.
+     * Initializes theme on client mount
      */
     function initTheme() {
       if (import.meta.client) {
@@ -49,7 +45,7 @@ export const useThemeStore = defineStore(
     }
 
     /**
-     * Toggles the theme and sets the user's preference.
+     * Toggles theme and persists user preference
      */
     function toggleTheme() {
       if (import.meta.client) {
@@ -59,8 +55,7 @@ export const useThemeStore = defineStore(
     }
 
     /**
-     * Watches for system preference changes and updates the theme if needed.
-     * @returns A cleanup function to remove the event listener.
+     * Watches system preference changes when user hasn't set explicit preference
      */
     function watchSystemPreference() {
       if (import.meta.server) {

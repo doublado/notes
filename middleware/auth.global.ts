@@ -3,20 +3,18 @@ import { authClient } from "~/lib/auth-client";
 export default defineNuxtRouteMiddleware(async (to) => {
 	const { data: session } = await authClient.useSession(useFetch);
 	
-	// If user is authenticated
 	if (session.value) {
-		// Redirect away from auth pages (except password reset)
+		// Redirect authenticated users away from auth pages
 		if (to.path.startsWith('/auth')) {
-			// Allow access to password reset page even when authenticated
+			// Allow password reset even when authenticated - users might want to change password
 			if (to.path === '/auth/reset' && to.query.token) {
-				return; // Allow access to password reset with token
+				return;
 			}
 			
-			// Redirect to dashboard for all other auth pages
 			return navigateTo('/dashboard');
 		}
 	} else {
-		// If user is not authenticated
+		// Protect dashboard from unauthenticated access
 		if (to.path === "/dashboard") {
 			return navigateTo("/auth");
 		}

@@ -1,19 +1,17 @@
 <script setup lang="ts">
 const themeStore = useThemeStore()
 
-// Computed property for theme icon to ensure consistency
+// Dynamic icon based on current theme for better UX
 const themeIcon = computed(() => {
   return themeStore.isDark ? 'pi pi-sun' : 'pi pi-moon'
 })
 
-// Initialize theme on mount
+// Initialize theme system and watch for system preference changes
 onMounted(() => {
   themeStore.initTheme()
   
-  // Watch for system preference changes
   const cleanup = themeStore.watchSystemPreference()
   
-  // Cleanup on unmount
   onUnmounted(() => {
     cleanup()
   })
@@ -39,7 +37,7 @@ const navigateToAuth = (tab: 'signin' | 'signup' = 'signin') => {
             </NuxtLink>
           </div>
           <div class="flex items-center space-x-4">
-            <!-- Theme Toggle Button -->
+            <!-- ClientOnly prevents hydration mismatch with theme toggle -->
             <ClientOnly>
               <Button 
                 :icon="themeIcon"

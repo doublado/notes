@@ -5,13 +5,13 @@ definePageMeta({
   layout: "default",
 })
 
-// Test email for demonstration
+// Test email for development purposes
 const testEmail = ref('test@example.com')
 
 // Loading states
 const isTestingReset = ref(false)
 
-// Test functions
+// Test password reset functionality for development
 const testPasswordReset = async () => {
   if (!testEmail.value) return
   
@@ -113,7 +113,7 @@ const testPasswordReset = async () => {
         </div>
       </div>
 
-      <!-- Auth Testing Section -->
+      <!-- Development testing section -->
       <div class="mt-12">
         <Card class="border-0 shadow-2">
           <template #header>

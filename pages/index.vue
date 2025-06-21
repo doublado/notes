@@ -9,16 +9,14 @@ const navigateToAuth = (tab: 'signin' | 'signup' = 'signin') => {
   router.push(`/auth?tab=${tab}`)
 }
 
-// Modal state for video
+// Video modal for demo purposes
 const showVideoModal = ref(false)
-
-// YouTube video ID
 const youtubeVideoId = ref('dQw4w9WgXcQ')
 
-// Auto-updating copyright year
+// Dynamic copyright year
 const currentYear = new Date().getFullYear()
 
-// Accordion data
+// FAQ data for accordion
 const accordionItems = ref([
   {
     header: 'How do I get started?',
@@ -42,7 +40,7 @@ const accordionItems = ref([
   }
 ])
 
-// Stats data
+// Marketing stats to build trust
 const stats = ref([
   { number: '100%', label: 'Free', icon: 'pi pi-gift' },
   { number: '∞', label: 'Notes', icon: 'pi pi-pen-to-square' },
