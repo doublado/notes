@@ -5,11 +5,17 @@ definePageMeta({
 
 const router = useRouter()
 
-const navigateToDashboard = () => {
-  router.push('/dashboard')
+const navigateToAuth = (tab: 'signin' | 'signup' = 'signin') => {
+  router.push(`/auth?tab=${tab}`)
 }
 
-// Auto-updatinavigateToDashboard copyright year
+// Modal state for video
+const showVideoModal = ref(false)
+
+// YouTube video ID
+const youtubeVideoId = ref('dQw4w9WgXcQ')
+
+// Auto-updating copyright year
 const currentYear = new Date().getFullYear()
 
 // Accordion data
@@ -69,7 +75,7 @@ const stats = ref([
                 label="Start Writing Now" 
                 size="large"
                 class="px-8 py-4 text-lg font-semibold"
-                @click="navigateToDashboard"
+                @click="navigateToAuth('signup')"
               >
                 <template #icon>
                   <i class="pi pi-pencil mr-2" />
@@ -81,6 +87,7 @@ const stats = ref([
                 outlined
                 size="large"
                 class="px-8 py-4 text-lg"
+                @click="showVideoModal = true"
               >
                 <template #icon>
                   <i class="pi pi-play mr-2" />
@@ -243,12 +250,17 @@ const stats = ref([
         </div>
 
         <Accordion class="shadow-2">
-          <AccordionTab v-for="item in accordionItems" :key="item.header" :header="item.header">
-            <template #headericon>
-              <i :class="item.icon" />
-            </template>
-            <p class="text-color-secondary leading-relaxed">{{ item.content }}</p>
-          </AccordionTab>
+          <AccordionPanel v-for="(item, index) in accordionItems" :key="item.header" :value="index">
+            <AccordionHeader>
+              <div class="flex items-center">
+                <i :class="item.icon" class="text-primary mr-3" />
+                <span>{{ item.header }}</span>
+              </div>
+            </AccordionHeader>
+            <AccordionContent>
+              <p class="m-0 text-color-secondary leading-relaxed">{{ item.content }}</p>
+            </AccordionContent>
+          </AccordionPanel>
         </Accordion>
       </div>
     </section>
@@ -267,7 +279,7 @@ const stats = ref([
             label="Start Writing Now" 
             size="large"
             class="px-8 py-4 text-lg font-semibold"
-            @click="navigateToDashboard"
+            @click="navigateToAuth('signup')"
           >
             <template #icon>
               <i class="pi pi-pencil mr-2" />
@@ -293,5 +305,33 @@ const stats = ref([
         </div>
       </div>
     </footer>
+
+    <!-- Video Modal -->
+    <Dialog 
+      v-model:visible="showVideoModal" 
+      modal 
+      :style="{ width: '90vw', maxWidth: '800px' }"
+      :closable="true"
+      :dismissable-mask="true"
+      class="video-modal"
+    >
+      <template #header>
+        <div class="flex items-center">
+          <i class="pi pi-play-circle text-primary mr-2" />
+          <span class="text-lg font-semibold">How NikJak Notes Works</span>
+        </div>
+      </template>
+      
+      <div class="relative w-full" style="padding-bottom: 56.25%;">
+        <iframe
+          v-if="showVideoModal"
+          :src="`https://www.youtube.com/embed/${youtubeVideoId}?autoplay=1&rel=0`"
+          class="absolute top-0 left-0 w-full h-full rounded-lg"
+          frameborder="0"
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+          allowfullscreen
+        />
+      </div>
+    </Dialog>
   </div>
 </template>
